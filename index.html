@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SPACESENSE</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg:      #050d1a;
+      --surface: #0b1931;
+      --border:  rgba(0,200,255,0.12);
+      --glow:    #00c8ff;
+      --accent:  #00ffe0;
+      --warn:    #ffb700;
+      --danger:  #ff3c5a;
+      --text:    #e2f4ff;
+      --muted:   #607a99;
+    }
+    body.light {
+      --bg:      #f0f6ff;
+      --surface: #ffffff;
+      --border:  rgba(0,120,200,0.15);
+      --glow:    #0078c8;
+      --accent:  #00a896;
+      --warn:    #c87800;
+      --danger:  #d6001c;
+      --text:    #0d1b2e;
+      --muted:   #5a7090;
+    }
+    *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+    body {
+      background:var(--bg); color:var(--text);
+      font-family:'DM Sans',sans-serif; min-height:100vh; overflow-x:hidden;
+      transition: background .35s, color .35s;
+    }
+
+    /* ===== THEME TOGGLE ===== */
+    .theme-toggle {
+      display:flex; align-items:center; gap:8px;
+      background:var(--surface); border:1px solid var(--border);
+      border-radius:999px; padding:5px 12px 5px 8px;
+      cursor:pointer; transition:all .2s; user-select:none;
+      font-size:12px; color:var(--muted);
+    }
+    .theme-toggle:hover { border-color:var(--glow); color:var(--glow); }
+    .toggle-track {
+      width:34px; height:18px; border-radius:999px;
+      background:rgba(0,200,255,.15); border:1px solid var(--border);
+      position:relative; transition:background .3s;
+      flex-shrink:0;
+    }
+    body.light .toggle-track { background:rgba(0,120,200,.18); }
+    .toggle-thumb {
+      position:absolute; top:2px; left:2px;
+      width:12px; height:12px; border-radius:50%;
+      background:var(--glow); transition:transform .3s, background .3s;
+      box-shadow:0 0 5px var(--glow);
+    }
+    body.light .toggle-thumb { transform:translateX(16px); }
+
+    /* ===== ANIMATED STARFIELD CANVAS ===== */
+    #star-canvas { position:fixed; inset:0; pointer-events:none; z-index:0; }
+
+    .wrapper { position:relative; z-index:1; max-width:1200px; margin:0 auto; padding:32px 20px 48px; }
+
+    /* header */
+    header { display:flex; align-items:center; justify-content:space-between; margin-bottom:40px; flex-wrap:wrap; gap:12px; }
+    .logo  { display:flex; align-items:center; gap:14px; }
+    .logo-icon { width:46px; height:46px; border-radius:12px; background:linear-gradient(135deg,#00c8ff22,#00ffe022);
+      border:1px solid var(--border); display:grid; place-items:center; font-size:22px; }
+    .logo h1 { font-family:'Orbitron',sans-serif; font-size:clamp(16px,3vw,24px); font-weight:800; letter-spacing:.08em;
+      background:linear-gradient(90deg,var(--glow),var(--accent)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+    .logo p  { font-size:11px; color:var(--muted); letter-spacing:.12em; text-transform:uppercase; margin-top:2px; }
+
+    .header-right { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .live-pill { display:flex; align-items:center; gap:8px; background:rgba(0,200,255,.08); border:1px solid rgba(0,200,255,.2);
+      border-radius:999px; padding:6px 14px; font-size:12px; color:var(--glow); font-weight:500; }
+    .live-dot  { width:8px; height:8px; border-radius:50%; background:var(--glow); box-shadow:0 0 6px var(--glow);
+      animation:pulse 1.4s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.7)} }
+
+    /* last-seen + uptime strip */
+    .info-strip { display:flex; gap:16px; flex-wrap:wrap; margin-bottom:16px; align-items:center; }
+    .info-chip { font-size:11px; color:var(--muted); background:rgba(0,200,255,.05); border:1px solid var(--border);
+      border-radius:8px; padding:4px 12px; display:flex; align-items:center; gap:6px; }
+    .info-chip span { color:var(--glow); font-weight:600; }
+
+    /* pause / fullscreen buttons */
+    .ctrl-btn { padding:7px 16px; border-radius:8px; border:1px solid var(--border); background:transparent;
+      color:var(--muted); font-family:'DM Sans',sans-serif; font-size:12px; cursor:pointer; transition:all .2s; display:flex; align-items:center; gap:6px; }
+    .ctrl-btn:hover { background:rgba(0,200,255,.1); border-color:var(--glow); color:var(--glow); }
+    .ctrl-btn.paused { background:rgba(255,183,0,.1); border-color:var(--warn); color:var(--warn); }
+
+    /* nav tabs */
+    .nav-tabs { display:flex; gap:8px; margin-bottom:24px; flex-wrap:wrap; }
+    .nav-tab  { padding:8px 20px; border-radius:8px; border:1px solid var(--border); background:transparent;
+      color:var(--muted); font-family:'DM Sans',sans-serif; font-size:13px; cursor:pointer; transition:all .2s; }
+    .nav-tab.active,
+    .nav-tab:hover { background:rgba(0,200,255,.1); border-color:var(--glow); color:var(--glow); }
+
+    /* pages */
+    .page { display:none; }
+    .page.active { display:block; }
+
+    /* stat cards */
+    .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; margin-bottom:28px; }
+    .card  { background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:22px 24px;
+      position:relative; overflow:hidden; transition:transform .2s,box-shadow .2s; }
+    .card::before { content:''; position:absolute; top:0; left:0; right:0; height:2px;
+      background:linear-gradient(90deg,transparent,var(--glow),transparent); opacity:.6; }
+    .card:hover { transform:translateY(-3px); box-shadow:0 8px 32px rgba(0,200,255,.12); }
+    .card-label { font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); margin-bottom:10px; }
+    .card-icon  { position:absolute; top:18px; right:18px; font-size:20px; opacity:.3; }
+    .card-value { font-family:'Orbitron',sans-serif; font-size:clamp(20px,3vw,28px); font-weight:600; color:var(--text); transition:color .4s; }
+    .card-value.warn   { color:var(--warn);   text-shadow:0 0 12px rgba(255,183,0,.5); }
+    .card-value.danger { color:var(--danger); text-shadow:0 0 12px rgba(255,60,90,.5); }
+    .card-value.ok     { color:var(--accent); text-shadow:0 0 12px rgba(0,255,224,.35); }
+    .status-badge { display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:500;
+      padding:4px 12px; border-radius:999px; margin-top:6px; }
+    .status-badge.ok     { background:rgba(0,255,224,.1);  color:var(--accent); border:1px solid rgba(0,255,224,.25); }
+    .status-badge.warn   { background:rgba(255,183,0,.12); color:var(--warn);   border:1px solid rgba(255,183,0,.3); }
+    .status-badge.danger { background:rgba(255,60,90,.12); color:var(--danger); border:1px solid rgba(255,60,90,.3); }
+
+    /* trend arrow */
+    .trend { display:inline-block; font-size:16px; margin-left:6px; vertical-align:middle; transition:all .3s; }
+    .trend.up   { color:var(--danger); }
+    .trend.down { color:var(--accent); }
+    .trend.flat { color:var(--muted); }
+
+    /* SEI gauge */
+    .gauge-wrap { display:flex; justify-content:center; margin:8px 0 4px; }
+    #sei-gauge  { display:block; }
+
+    /* model bar */
+    .model-bar  { display:flex; flex-wrap:wrap; background:rgba(0,200,255,.04); border:1px solid var(--border);
+      border-radius:14px; margin-bottom:20px; overflow:hidden; }
+    .model-stat { flex:1; min-width:140px; padding:14px 20px; border-right:1px solid var(--border);
+      display:flex; flex-direction:column; gap:5px; }
+    .model-stat:last-child { border-right:none; }
+    .model-label { font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); }
+    .model-val   { font-family:'Orbitron',sans-serif; font-size:14px; font-weight:600; color:var(--glow); }
+
+    /* chart panel */
+    .chart-panel  { background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:28px 28px 22px; margin-bottom:20px; }
+    .chart-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:22px; flex-wrap:wrap; gap:10px; }
+    .chart-title  { font-family:'Orbitron',sans-serif; font-size:14px; font-weight:600; color:var(--text); letter-spacing:.06em; }
+    .chart-subtitle { font-size:11px; color:var(--muted); margin-top:3px; }
+    .legend      { display:flex; gap:18px; align-items:center; flex-wrap:wrap; }
+    .legend-item { display:flex; align-items:center; gap:7px; font-size:12px; color:var(--muted); }
+    .legend-line { width:24px; height:2px; border-radius:1px; }
+    .legend-line.actual    { background:var(--glow); }
+    .legend-line.predicted { background:var(--warn); }
+    .legend-line.threshold { background:var(--danger); }
+    .chart-wrap  { position:relative; height:300px; }
+
+    /* fullscreen overlay */
+    .fullscreen-overlay { display:none; position:fixed; inset:0; z-index:1000; background:var(--bg);
+      padding:24px; flex-direction:column; }
+    .fullscreen-overlay.open { display:flex; }
+    .fs-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+    .fs-title  { font-family:'Orbitron',sans-serif; font-size:16px; color:var(--glow); }
+    .fs-close  { background:none; border:1px solid var(--border); color:var(--muted); border-radius:8px;
+      padding:6px 14px; cursor:pointer; font-size:13px; transition:all .2s; }
+    .fs-close:hover { border-color:var(--glow); color:var(--glow); }
+    .fs-chart-wrap { flex:1; position:relative; }
+
+    /* heatmap page */
+    .heatmap-panel { background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:28px; margin-bottom:20px; }
+    .heatmap-title { font-family:'Orbitron',sans-serif; font-size:14px; font-weight:600; color:var(--text);
+      letter-spacing:.06em; margin-bottom:6px; }
+    .heatmap-sub   { font-size:11px; color:var(--muted); margin-bottom:20px; }
+    #heatmap-canvas { width:100%; height:320px; border-radius:12px; display:block; }
+
+    /* difference table */
+    .diff-panel { background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:28px; margin-bottom:20px; }
+    .diff-title { font-family:'Orbitron',sans-serif; font-size:14px; font-weight:600; color:var(--text); letter-spacing:.06em; margin-bottom:16px; }
+    .diff-table { width:100%; border-collapse:collapse; font-size:13px; }
+    .diff-table th { padding:10px 14px; text-align:left; font-size:10px; letter-spacing:.12em; text-transform:uppercase;
+      color:var(--muted); border-bottom:1px solid var(--border); }
+    .diff-table td { padding:10px 14px; border-bottom:1px solid rgba(0,200,255,.06); color:var(--text); }
+    .diff-table tr:last-child td { border-bottom:none; }
+    .diff-pos  { color:var(--danger); font-weight:600; }
+    .diff-neg  { color:var(--accent); font-weight:600; }
+    .diff-zero { color:var(--muted); }
+
+    /* export button */
+    .panel-actions { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; flex-wrap:wrap; gap:10px; }
+    .export-btn { padding:7px 16px; border-radius:8px; border:1px solid rgba(0,255,224,.25); background:rgba(0,255,224,.06);
+      color:var(--accent); font-size:12px; cursor:pointer; transition:all .2s; display:flex; align-items:center; gap:6px; }
+    .export-btn:hover { background:rgba(0,255,224,.14); border-color:var(--accent); }
+
+    /* ===== ALERTS PAGE ===== */
+    .alerts-panel { background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:28px; margin-bottom:20px; }
+    .alerts-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; flex-wrap:wrap; gap:10px; }
+    .alerts-title  { font-family:'Orbitron',sans-serif; font-size:14px; font-weight:600; color:var(--text); letter-spacing:.06em; }
+    .alerts-count  { font-family:'Orbitron',sans-serif; font-size:12px; padding:3px 10px; border-radius:999px;
+      background:rgba(255,60,90,.12); color:var(--danger); border:1px solid rgba(255,60,90,.25); }
+    .alert-item { display:flex; align-items:flex-start; gap:14px; padding:14px 0; border-bottom:1px solid rgba(0,200,255,.06); }
+    .alert-item:last-child { border-bottom:none; }
+    .alert-dot  { width:10px; height:10px; border-radius:50%; flex-shrink:0; margin-top:4px; }
+    .alert-dot.danger { background:var(--danger); box-shadow:0 0 6px var(--danger); }
+    .alert-dot.warn   { background:var(--warn);   box-shadow:0 0 6px var(--warn); }
+    .alert-dot.ok     { background:var(--accent);  box-shadow:0 0 6px var(--accent); }
+    .alert-body  { flex:1; }
+    .alert-msg   { font-size:13px; color:var(--text); margin-bottom:3px; }
+    .alert-meta  { font-size:11px; color:var(--muted); }
+    .alert-sei   { font-family:'Orbitron',sans-serif; font-size:12px; color:var(--muted); flex-shrink:0; margin-top:2px; }
+    .no-alerts   { text-align:center; padding:40px; color:var(--muted); font-size:13px; }
+
+    /* ===== ANALYTICS PAGE ===== */
+    .analytics-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px; margin-bottom:20px; }
+    .analytic-card  { background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:22px 24px; position:relative; overflow:hidden; }
+    .analytic-card::before { content:''; position:absolute; top:0; left:0; right:0; height:2px;
+      background:linear-gradient(90deg,transparent,var(--accent),transparent); opacity:.5; }
+    .analytic-label { font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); margin-bottom:8px; }
+    .analytic-value { font-family:'Orbitron',sans-serif; font-size:clamp(18px,2.5vw,26px); font-weight:600; color:var(--accent); }
+    .analytic-sub   { font-size:11px; color:var(--muted); margin-top:6px; }
+    .analytic-bar   { height:4px; border-radius:2px; background:rgba(0,200,255,.1); margin-top:12px; overflow:hidden; }
+    .analytic-fill  { height:100%; border-radius:2px; background:linear-gradient(90deg,var(--glow),var(--accent)); transition:width .6s; }
+
+    /* ===== SETTINGS PAGE ===== */
+    .settings-panel { background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:28px; margin-bottom:20px; }
+    .settings-title { font-family:'Orbitron',sans-serif; font-size:14px; font-weight:600; color:var(--text); letter-spacing:.06em; margin-bottom:20px; }
+    .setting-row    { display:flex; align-items:center; justify-content:space-between; padding:14px 0;
+      border-bottom:1px solid rgba(0,200,255,.06); flex-wrap:wrap; gap:10px; }
+    .setting-row:last-child { border-bottom:none; }
+    .setting-label  { font-size:13px; color:var(--text); }
+    .setting-desc   { font-size:11px; color:var(--muted); margin-top:2px; }
+    .setting-input  { background:var(--bg); border:1px solid var(--border); color:var(--text); border-radius:8px;
+      padding:7px 12px; font-family:'DM Sans',sans-serif; font-size:13px; width:120px; text-align:right;
+      outline:none; transition:border-color .2s; }
+    .setting-input:focus { border-color:var(--glow); }
+    .setting-apply  { padding:8px 20px; border-radius:8px; border:1px solid var(--glow); background:rgba(0,200,255,.1);
+      color:var(--glow); font-family:'DM Sans',sans-serif; font-size:13px; cursor:pointer; transition:all .2s; margin-top:16px; }
+    .setting-apply:hover { background:rgba(0,200,255,.2); }
+    .setting-note   { font-size:11px; color:var(--accent); margin-top:12px; }
+
+    /* shimmer */
+    @keyframes shimmer { 0%{background-position:-400px 0} 100%{background-position:400px 0} }
+    .shimmer { background:linear-gradient(90deg,var(--surface) 25%,rgba(0,200,255,.06) 50%,var(--surface) 75%);
+      background-size:800px 100%; animation:shimmer 1.6s infinite linear; border-radius:6px;
+      color:transparent !important; user-select:none; }
+    body.light .shimmer { background:linear-gradient(90deg,#e8f0fa 25%,rgba(0,120,200,.08) 50%,#e8f0fa 75%);
+      background-size:800px 100%; }
+    body.light .setting-input { background:#f0f6ff; }
+    body.light #star-canvas { opacity:0.18; }
+
+    footer { margin-top:28px; text-align:center; font-size:11px; color:var(--muted); letter-spacing:.1em; }
+  </style>
+</head>
+<body>
+<!-- Animated star canvas -->
+<canvas id="star-canvas"></canvas>
+
+<div class="wrapper">
+
+  <!-- Header -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">&#128752;</div>
+      <div>
+        <h1>SPACESENSE</h1>
+        <p>Real-Time Space Encroachment Intelligence</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark mode">
+        <div class="toggle-track"><div class="toggle-thumb"></div></div>
+        <span id="theme-label">☀️ Light</span>
+      </div>
+      <button class="ctrl-btn" id="pause-btn" onclick="togglePause()">&#9646;&#9646; Pause</button>
+      <div class="live-pill"><div class="live-dot" id="live-dot"></div><span id="live-label">LIVE MONITORING</span></div>
+    </div>
+  </header>
+
+  <!-- Info strip: uptime + last seen + readings count -->
+  <div class="info-strip">
+    <div class="info-chip">&#128337; Uptime: <span id="uptime-val">0s</span></div>
+    <div class="info-chip">&#128268; Last data: <span id="lastseen-val">--</span></div>
+    <div class="info-chip">&#128200; Readings: <span id="readings-count">0</span></div>
+    <div class="info-chip">&#128680; Alerts fired: <span id="alert-count-strip">0</span></div>
+  </div>
+
+  <!-- Navigation -->
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showPage('dashboard',this)">&#128200; Dashboard</button>
+    <button class="nav-tab"        onclick="showPage('heatmap',this)">&#127777; Heatmap</button>
+    <button class="nav-tab"        onclick="showPage('alerts',this)">&#128680; Alerts</button>
+    <button class="nav-tab"        onclick="showPage('analytics',this)">&#128202; Analytics</button>
+    <button class="nav-tab"        onclick="showPage('settings',this)">&#9881; Settings</button>
+  </div>
+
+  <!-- ===== DASHBOARD PAGE ===== -->
+  <div class="page active" id="page-dashboard">
+
+    <div class="cards">
+      <!-- Distance card with trend -->
+      <div class="card">
+        <div class="card-icon">&#128225;</div>
+        <div class="card-label">Sensor Distance</div>
+        <div style="display:flex;align-items:baseline;gap:4px;">
+          <div class="card-value shimmer" id="val-distance">---</div>
+          <span class="trend flat" id="trend-distance" title="trend">&#8212;</span>
+        </div>
+      </div>
+      <!-- Prediction card -->
+      <div class="card">
+        <div class="card-icon">&#129302;</div>
+        <div class="card-label">AI Prediction</div>
+        <div class="card-value shimmer" id="val-prediction">---</div>
+      </div>
+      <!-- SEI card with mini gauge -->
+      <div class="card">
+        <div class="card-icon">&#128202;</div>
+        <div class="card-label">Space Encroachment Index</div>
+        <div class="card-value shimmer" id="val-sei">---</div>
+        <div class="gauge-wrap"><canvas id="sei-gauge" width="160" height="90"></canvas></div>
+      </div>
+      <!-- Status card -->
+      <div class="card">
+        <div class="card-icon">&#128274;</div>
+        <div class="card-label">System Status</div>
+        <div class="card-value shimmer" id="val-status">---</div>
+        <div id="status-badge"></div>
+      </div>
+    </div>
+
+    <div class="model-bar">
+      <div class="model-stat"><span class="model-label">MODEL</span><span class="model-val" id="m-type">--</span></div>
+      <div class="model-stat"><span class="model-label">SAMPLES USED</span><span class="model-val" id="m-samples">--</span></div>
+      <div class="model-stat"><span class="model-label">TRAINING LOSS</span><span class="model-val" id="m-loss">--</span></div>
+      <div class="model-stat"><span class="model-label">LAST UPDATED</span><span class="model-val" id="m-time">--</span></div>
+    </div>
+
+    <div class="chart-panel">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Distance Timeline</div>
+          <div class="chart-subtitle">Live sensor readings vs AI-predicted values (last 50 points)</div>
+        </div>
+        <div class="legend">
+          <div class="legend-item"><div class="legend-line actual"></div>Actual</div>
+          <div class="legend-item"><div class="legend-line predicted"></div>Predicted</div>
+          <div class="legend-item"><div class="legend-line threshold"></div>Threshold</div>
+          <button class="ctrl-btn" onclick="openFullscreen()" title="Fullscreen chart">&#9974; Fullscreen</button>
+        </div>
+      </div>
+      <div class="chart-wrap"><canvas id="chart"></canvas></div>
+    </div>
+
+  </div><!-- /page-dashboard -->
+
+  <!-- ===== HEATMAP PAGE ===== -->
+  <div class="page" id="page-heatmap">
+
+    <div class="heatmap-panel">
+      <div class="heatmap-title">Space Occupancy Heatmap</div>
+      <div class="heatmap-sub">Colour intensity shows encroachment level — red = high, green = clear</div>
+      <canvas id="heatmap-canvas" height="320"></canvas>
+    </div>
+
+    <div class="diff-panel">
+      <div class="panel-actions">
+        <div class="diff-title" style="margin-bottom:0">Actual vs Predicted Difference Log</div>
+        <button class="export-btn" onclick="exportCSV()">&#11123; Export CSV</button>
+      </div>
+      <table class="diff-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Actual (cm)</th>
+            <th>Predicted (cm)</th>
+            <th>Difference</th>
+            <th>SEI</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="diff-tbody"></tbody>
+      </table>
+    </div>
+
+  </div><!-- /page-heatmap -->
+
+  <!-- ===== ALERTS PAGE ===== -->
+  <div class="page" id="page-alerts">
+    <div class="alerts-panel">
+      <div class="alerts-header">
+        <div class="alerts-title">&#128680; Alert History</div>
+        <div class="alerts-count" id="alerts-count-badge">0 alerts</div>
+      </div>
+      <div id="alerts-list"><div class="no-alerts">&#9989; No alerts yet — system is monitoring...</div></div>
+    </div>
+  </div>
+
+  <!-- ===== ANALYTICS PAGE ===== -->
+  <div class="page" id="page-analytics">
+    <div class="analytics-grid">
+      <div class="analytic-card">
+        <div class="analytic-label">Average Distance</div>
+        <div class="analytic-value" id="an-avg-dist">--</div>
+        <div class="analytic-sub">Mean of all readings</div>
+        <div class="analytic-bar"><div class="analytic-fill" id="an-avg-fill" style="width:0%"></div></div>
+      </div>
+      <div class="analytic-card">
+        <div class="analytic-label">Min Distance Recorded</div>
+        <div class="analytic-value" id="an-min-dist" style="color:var(--danger)">--</div>
+        <div class="analytic-sub">Highest encroachment point</div>
+      </div>
+      <div class="analytic-card">
+        <div class="analytic-label">Max Distance Recorded</div>
+        <div class="analytic-value" id="an-max-dist" style="color:var(--accent)">--</div>
+        <div class="analytic-sub">Clearest reading</div>
+      </div>
+      <div class="analytic-card">
+        <div class="analytic-label">Avg SEI</div>
+        <div class="analytic-value" id="an-avg-sei">--</div>
+        <div class="analytic-sub">Mean encroachment index</div>
+        <div class="analytic-bar"><div class="analytic-fill" id="an-sei-fill" style="width:0%;background:linear-gradient(90deg,var(--accent),var(--danger))"></div></div>
+      </div>
+      <div class="analytic-card">
+        <div class="analytic-label">Encroachment Events</div>
+        <div class="analytic-value" id="an-enc-count" style="color:var(--danger)">--</div>
+        <div class="analytic-sub">Readings with SEI &gt; 0.5</div>
+      </div>
+      <div class="analytic-card">
+        <div class="analytic-label">Prediction Accuracy</div>
+        <div class="analytic-value" id="an-accuracy">--</div>
+        <div class="analytic-sub">Avg abs. pred. error</div>
+        <div class="analytic-bar"><div class="analytic-fill" id="an-acc-fill" style="width:0%"></div></div>
+      </div>
+    </div>
+    <div class="alerts-panel">
+      <div class="alerts-title" style="margin-bottom:16px;">&#128202; SEI Distribution</div>
+      <div style="position:relative;height:200px;"><canvas id="dist-chart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ===== SETTINGS PAGE ===== -->
+  <div class="page" id="page-settings">
+    <div class="settings-panel">
+      <div class="settings-title">&#9881; Configuration</div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Expected Distance (cm)</div>
+          <div class="setting-desc">Baseline clear-space distance in centimetres</div>
+        </div>
+        <input class="setting-input" type="number" id="cfg-expected" value="100" min="1"/>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Poll Interval (ms)</div>
+          <div class="setting-desc">How often to fetch new data from Firebase</div>
+        </div>
+        <input class="setting-input" type="number" id="cfg-interval" value="1000" min="500" step="500"/>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Max Chart Points</div>
+          <div class="setting-desc">Number of data points shown on the timeline</div>
+        </div>
+        <input class="setting-input" type="number" id="cfg-maxpts" value="50" min="10" max="200"/>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Encroachment Threshold (SEI)</div>
+          <div class="setting-desc">SEI value above which ENCROACHMENT is triggered</div>
+        </div>
+        <input class="setting-input" type="number" id="cfg-enc-thresh" value="0.5" min="0.01" max="1" step="0.05"/>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Temporary Threshold (SEI)</div>
+          <div class="setting-desc">SEI value above which TEMPORARY warning fires</div>
+        </div>
+        <input class="setting-input" type="number" id="cfg-tmp-thresh" value="0.2" min="0.01" max="1" step="0.05"/>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Sound Alerts</div>
+          <div class="setting-desc">Play beep when encroachment is detected</div>
+        </div>
+        <input class="setting-input" type="text" id="cfg-sound" value="ON" style="width:80px;text-align:center;" readonly onclick="this.value=this.value==='ON'?'OFF':'ON';" style="cursor:pointer;"/>
+      </div>
+      <button class="setting-apply" onclick="applySettings()">&#10003; Apply Settings</button>
+      <div class="setting-note" id="settings-note"></div>
+    </div>
+  </div>
+
+  <footer>SPACESENSE AI PRO &nbsp;&middot;&nbsp; Auto-refresh every 1s &nbsp;&middot;&nbsp; Firebase Realtime DB</footer>
+</div>
+
+<!-- Fullscreen chart overlay -->
+<div class="fullscreen-overlay" id="fs-overlay">
+  <div class="fs-header">
+    <div class="fs-title">Distance Timeline — Fullscreen</div>
+    <button class="fs-close" onclick="closeFullscreen()">&#10005; Close</button>
+  </div>
+  <div class="fs-chart-wrap"><canvas id="fs-chart"></canvas></div>
+</div>
+
+<script>
+/* ===== THEME TOGGLE ===== */
+let isLight = false;
+function toggleTheme() {
+  isLight = !isLight;
+  document.body.classList.toggle('light', isLight);
+  document.getElementById('theme-label').textContent = isLight ? '🌙 Dark' : '☀️ Light';
+  updateChartTheme();
+  if (window._distChart) updateDistChartTheme();
+}
+
+function getThemeColors() {
+  return isLight
+    ? { grid:'rgba(0,120,200,0.08)', tick:'#5a7090', bg:'#ffffff', tooltip:'#f0f6ff', tooltipBorder:'rgba(0,120,200,0.2)', titleColor:'#0078c8', bodyColor:'#0d1b2e' }
+    : { grid:'rgba(0,200,255,0.06)', tick:'#607a99', bg:'#0b1931', tooltip:'#0b1931', tooltipBorder:'rgba(0,200,255,0.25)', titleColor:'#00c8ff', bodyColor:'#e2f4ff' };
+}
+
+function updateChartTheme() {
+  const c = getThemeColors();
+  chart.options.scales.x.grid.color = c.grid;
+  chart.options.scales.y.grid.color = c.grid;
+  chart.options.scales.x.ticks.color = c.tick;
+  chart.options.scales.y.ticks.color = c.tick;
+  chart.options.plugins.tooltip.backgroundColor = c.tooltip;
+  chart.options.plugins.tooltip.borderColor = c.tooltipBorder;
+  chart.options.plugins.tooltip.titleColor = c.titleColor;
+  chart.options.plugins.tooltip.bodyColor = c.bodyColor;
+  chart.update();
+}
+
+function updateDistChartTheme() {
+  const c = getThemeColors();
+  window._distChart.options.scales.x.grid.color = c.grid;
+  window._distChart.options.scales.y.grid.color = c.grid;
+  window._distChart.options.scales.x.ticks.color = c.tick;
+  window._distChart.options.scales.y.ticks.color = c.tick;
+  window._distChart.update();
+}
+
+
+(function() {
+  const canvas = document.getElementById('star-canvas');
+  const ctx    = canvas.getContext('2d');
+  let stars    = [];
+  const N      = 180;
+
+  function resize() {
+    canvas.width  = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  function mkStar() {
+    return {
+      x:    Math.random() * canvas.width,
+      y:    Math.random() * canvas.height,
+      r:    Math.random() * 1.2 + 0.2,
+      a:    Math.random(),
+      da:   (Math.random() * 0.004 + 0.001) * (Math.random() < .5 ? 1 : -1),
+      vx:   (Math.random() - 0.5) * 0.06,
+      vy:   (Math.random() - 0.5) * 0.06,
+    };
+  }
+  function init() { resize(); stars = Array.from({length:N}, mkStar); }
+  function tick() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (const s of stars) {
+      s.a  += s.da;
+      if (s.a > 1 || s.a < 0) s.da *= -1;
+      s.x  += s.vx; s.y += s.vy;
+      if (s.x < 0) s.x = canvas.width;
+      if (s.x > canvas.width) s.x = 0;
+      if (s.y < 0) s.y = canvas.height;
+      if (s.y > canvas.height) s.y = 0;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255,255,255,${s.a * 0.7})`;
+      ctx.fill();
+    }
+    // subtle nebula glow
+    const g1 = ctx.createRadialGradient(canvas.width*.3, canvas.height*.2, 0, canvas.width*.3, canvas.height*.2, canvas.width*.35);
+    g1.addColorStop(0,'rgba(0,200,255,0.04)'); g1.addColorStop(1,'transparent');
+    ctx.fillStyle = g1; ctx.fillRect(0,0,canvas.width,canvas.height);
+    requestAnimationFrame(tick);
+  }
+  window.addEventListener('resize', () => { resize(); });
+  init(); tick();
+})();
+
+/* ===== CONFIG (mutable) ===== */
+let EXPECTED     = 100;
+let MAX_POINTS   = 50;
+let POLL_MS      = 1000;
+let ENC_THRESH   = 0.5;
+let TMP_THRESH   = 0.2;
+let SOUND_ON     = true;
+
+const LATEST_URL  = "https://public-space-detection-default-rtdb.firebaseio.com/node1/latest.json";
+const HISTORY_URL = "https://public-space-detection-default-rtdb.firebaseio.com/node1/history.json";
+const PRED_URL    = "https://public-space-detection-default-rtdb.firebaseio.com/prediction.json";
+
+/* ===== STATE ===== */
+const labels    = [];
+const actualArr = [];
+const predArr   = [];
+let   lastCount  = 0;
+let   lastPred   = null;
+let   prevDist   = null;
+let   isPaused   = false;
+let   pollTimer  = null;
+let   startTime  = Date.now();
+let   lastSeenTs = null;
+let   alertsLog  = [];          // [{ts, msg, level, sei, dist}]
+let   prevStatus = null;        // track status transitions
+
+/* ===== AUDIO ===== */
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function playTone(freq, startTime, dur, vol, type = 'square') {
+  try {
+    const ac   = getAudioCtx();
+    const osc  = ac.createOscillator();
+    const gain = ac.createGain();
+
+    // Distortion for edge/bite
+    const dist = ac.createWaveShaper();
+    const curve = new Float32Array(256);
+    for (let i = 0; i < 256; i++) {
+      const x = (i * 2) / 256 - 1;
+      curve[i] = (Math.PI + 120) * x / (Math.PI + 120 * Math.abs(x));
+    }
+    dist.curve = curve;
+
+    osc.connect(dist);
+    dist.connect(gain);
+    gain.connect(ac.destination);
+
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, startTime);
+
+    // Sharp attack, short sustain, fast decay
+    gain.gain.setValueAtTime(0, startTime);
+    gain.gain.linearRampToValueAtTime(vol, startTime + 0.01);
+    gain.gain.setValueAtTime(vol, startTime + dur * 0.4);
+    gain.gain.exponentialRampToValueAtTime(0.001, startTime + dur);
+
+    osc.start(startTime);
+    osc.stop(startTime + dur + 0.01);
+  } catch(e) {}
+}
+
+function alertBeep() {
+  if (!SOUND_ON) return;
+  try {
+    const ac = getAudioCtx();
+    if (ac.state === 'suspended') ac.resume();
+    const t = ac.currentTime;
+
+    // Three sharp descending blasts — loud, square wave, with a sub-bass punch
+    // Blast 1: high alarm tone
+    playTone(1046, t,        0.18, 1.0, 'square');   // C6
+    playTone(523,  t,        0.18, 0.6, 'sawtooth');  // C5 sub layer
+    // Blast 2
+    playTone(880,  t + 0.22, 0.18, 1.0, 'square');   // A5
+    playTone(440,  t + 0.22, 0.18, 0.6, 'sawtooth');
+    // Blast 3: longer, lower resolution tone
+    playTone(698,  t + 0.44, 0.28, 1.0, 'square');   // F5
+    playTone(349,  t + 0.44, 0.28, 0.6, 'sawtooth');
+  } catch(e) {}
+}
+
+/* ===== PAGE SWITCH ===== */
+function showPage(name, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  if (btn) btn.classList.add('active');
+  if (name === 'heatmap') { drawHeatmap(); updateDiffTable(lastPred); }
+  if (name === 'analytics') updateAnalytics();
+  if (name === 'alerts') renderAlerts();
+}
+
+/* ===== PAUSE / RESUME ===== */
+function togglePause() {
+  isPaused = !isPaused;
+  const btn = document.getElementById('pause-btn');
+  const dot = document.getElementById('live-dot');
+  const lbl = document.getElementById('live-label');
+  if (isPaused) {
+    btn.textContent = '▶ Resume'; btn.classList.add('paused');
+    dot.style.animationPlayState = 'paused'; lbl.textContent = 'PAUSED';
+    clearInterval(pollTimer);
+  } else {
+    btn.textContent = '⏸ Pause'; btn.classList.remove('paused');
+    dot.style.animationPlayState = 'running'; lbl.textContent = 'LIVE MONITORING';
+    poll();
+    pollTimer = setInterval(poll, POLL_MS);
+  }
+}
+
+/* ===== UPTIME ===== */
+setInterval(() => {
+  const s = Math.floor((Date.now() - startTime) / 1000);
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60;
+  document.getElementById('uptime-val').textContent =
+    h > 0 ? `${h}h ${m}m ${sec}s` : m > 0 ? `${m}m ${sec}s` : `${sec}s`;
+}, 1000);
+
+/* ===== TREND ARROW ===== */
+function updateTrend(current) {
+  const el = document.getElementById('trend-distance');
+  if (prevDist === null) { el.textContent='—'; el.className='trend flat'; return; }
+  const diff = current - prevDist;
+  if (Math.abs(diff) < 0.2) { el.textContent='→'; el.className='trend flat'; }
+  else if (diff > 0)         { el.textContent='↑'; el.className='trend up'; }
+  else                       { el.textContent='↓'; el.className='trend down'; }
+}
+
+/* ===== SEI GAUGE ===== */
+function drawGauge(sei) {
+  const canvas = document.getElementById('sei-gauge');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0,0,W,H);
+  const cx = W/2, cy = H - 10, R = 65;
+  const startAngle = Math.PI, endAngle = 0;
+
+  // Track
+  ctx.beginPath(); ctx.arc(cx,cy,R,startAngle,endAngle);
+  ctx.strokeStyle='rgba(0,200,255,0.1)'; ctx.lineWidth=12; ctx.lineCap='round'; ctx.stroke();
+
+  // Fill
+  const ratio = Math.max(0,Math.min(1,sei));
+  const fillEnd = Math.PI + ratio * Math.PI;
+  const r = Math.round(ratio < 0.5 ? ratio*2*255 : 255);
+  const g = Math.round(ratio < 0.5 ? 200+(1-ratio*2)*55 : (1-(ratio-.5)*2)*200);
+  const b = 50;
+  const grad = ctx.createLinearGradient(cx-R,cy,cx+R,cy);
+  grad.addColorStop(0,'#00ffe0'); grad.addColorStop(0.5,'#ffb700'); grad.addColorStop(1,'#ff3c5a');
+  ctx.beginPath(); ctx.arc(cx,cy,R,startAngle,fillEnd);
+  ctx.strokeStyle=grad; ctx.lineWidth=12; ctx.lineCap='round'; ctx.stroke();
+
+  // Needle
+  const ang = Math.PI + ratio*Math.PI;
+  const nx = cx + Math.cos(ang)*52, ny = cy + Math.sin(ang)*52;
+  ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(nx,ny);
+  ctx.strokeStyle='#e2f4ff'; ctx.lineWidth=2; ctx.lineCap='round'; ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx,cy,5,0,Math.PI*2);
+  ctx.fillStyle='#e2f4ff'; ctx.fill();
+
+  // Labels
+  ctx.fillStyle='#607a99'; ctx.font='9px DM Sans'; ctx.textAlign='center';
+  ctx.fillText('0', cx-R-2, cy+12);
+  ctx.fillText('1', cx+R+2, cy+12);
+  ctx.fillText(sei.toFixed(3), cx, cy-20);
+}
+
+/* ===== ALERT LOG ===== */
+function addAlert(level, msg, sei, dist) {
+  alertsLog.unshift({ ts: new Date(), level, msg, sei, dist });
+  if (alertsLog.length > 100) alertsLog.pop();
+  const n = alertsLog.length;
+  document.getElementById('alerts-count-badge').textContent = n + ' alert' + (n===1?'':'s');
+  document.getElementById('alert-count-strip').textContent  = n;
+}
+
+function renderAlerts() {
+  const list = document.getElementById('alerts-list');
+  if (alertsLog.length === 0) {
+    list.innerHTML = '<div class="no-alerts">&#9989; No alerts yet — system is monitoring...</div>';
+    return;
+  }
+  list.innerHTML = alertsLog.map(a => `
+    <div class="alert-item">
+      <div class="alert-dot ${a.level}"></div>
+      <div class="alert-body">
+        <div class="alert-msg">${a.msg}</div>
+        <div class="alert-meta">${a.ts.toLocaleString()} &nbsp;·&nbsp; Distance: ${a.dist !== null ? a.dist.toFixed(2)+' cm' : '--'}</div>
+      </div>
+      <div class="alert-sei">SEI ${a.sei.toFixed(3)}</div>
+    </div>`).join('');
+}
+
+/* ===== ANALYTICS ===== */
+function updateAnalytics() {
+  if (actualArr.length === 0) return;
+  const avg = actualArr.reduce((a,b)=>a+b,0)/actualArr.length;
+  const mn  = Math.min(...actualArr);
+  const mx  = Math.max(...actualArr);
+  const seis= actualArr.map(d=>(EXPECTED-d)/EXPECTED);
+  const avgSei = seis.reduce((a,b)=>a+b,0)/seis.length;
+  const encCount = seis.filter(s=>s>ENC_THRESH).length;
+
+  let totalErr = 0, errCount = 0;
+  predArr.forEach((p,i) => { if (p!==null && actualArr[i]!==undefined) { totalErr+=Math.abs(actualArr[i]-p); errCount++; } });
+  const avgErr = errCount ? totalErr/errCount : null;
+
+  document.getElementById('an-avg-dist').textContent = avg.toFixed(2)+' cm';
+  document.getElementById('an-min-dist').textContent  = mn.toFixed(2)+' cm';
+  document.getElementById('an-max-dist').textContent  = mx.toFixed(2)+' cm';
+  document.getElementById('an-avg-sei').textContent   = avgSei.toFixed(3);
+  document.getElementById('an-enc-count').textContent = encCount;
+  document.getElementById('an-accuracy').textContent  = avgErr !== null ? '±'+avgErr.toFixed(2)+' cm' : '--';
+
+  document.getElementById('an-avg-fill').style.width  = Math.min(100,(avg/EXPECTED)*100)+'%';
+  document.getElementById('an-sei-fill').style.width  = Math.min(100,avgSei*100)+'%';
+  document.getElementById('an-acc-fill').style.width  = avgErr !== null ? Math.max(0,100-avgErr*2)+'%' : '0%';
+
+  // Distribution mini chart
+  const bands = [0,0,0,0,0]; // 0-.2, .2-.35, .35-.5, .5-.7, .7+
+  seis.forEach(s => {
+    if (s<0.2) bands[0]++;
+    else if (s<0.35) bands[1]++;
+    else if (s<0.5) bands[2]++;
+    else if (s<0.7) bands[3]++;
+    else bands[4]++;
+  });
+  if (window._distChart) { window._distChart.data.datasets[0].data = bands; window._distChart.update(); return; }
+  window._distChart = new Chart(document.getElementById('dist-chart').getContext('2d'), {
+    type:'bar',
+    data:{
+      labels:['0–0.2 (Normal)','0.2–0.35','0.35–0.5','0.5–0.7','0.7+ (High)'],
+      datasets:[{ data:bands, backgroundColor:['#00ffe055','#80ff8055','#ffb70055','#ff803055','#ff3c5a55'],
+        borderColor:['#00ffe0','#80ff80','#ffb700','#ff8030','#ff3c5a'], borderWidth:2, borderRadius:6 }]
+    },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+      scales:{ x:{ticks:{color:'#607a99',font:{size:10}},grid:{color:'rgba(0,200,255,0.06)'}},
+               y:{ticks:{color:'#607a99'},grid:{color:'rgba(0,200,255,0.06)'},beginAtZero:true} } }
+  });
+  updateDistChartTheme();
+}
+
+/* ===== MAIN CHART ===== */
+const chart = new Chart(document.getElementById('chart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label:'Actual Distance (cm)', data:actualArr,
+        borderColor:'#00c8ff', backgroundColor:'rgba(0,200,255,0.07)',
+        borderWidth:2.5, tension:0.45, fill:true,
+        pointRadius:4, pointBackgroundColor:'#00c8ff', pointBorderColor:'#050d1a', pointBorderWidth:2 },
+      { label:'Predicted Distance (cm)', data:predArr,
+        borderColor:'#ffb700', backgroundColor:'transparent',
+        borderWidth:2, borderDash:[7,5], tension:0.45, fill:false,
+        pointRadius:3, pointBackgroundColor:'#ffb700', pointBorderColor:'#050d1a', pointBorderWidth:2 },
+      { label:'Threshold', data:[], borderColor:'rgba(255,60,90,0.55)',
+        borderWidth:1.5, borderDash:[4,4], tension:0, fill:false,
+        pointRadius:0 }
+    ]
+  },
+  options: {
+    responsive:true, maintainAspectRatio:false, animation:{ duration:300 },
+    interaction:{ mode:'index', intersect:false },
+    plugins: {
+      legend:{ display:false },
+      tooltip:{ backgroundColor:'#0b1931', borderColor:'rgba(0,200,255,0.25)', borderWidth:1,
+        titleColor:'#00c8ff', bodyColor:'#e2f4ff', padding:12,
+        callbacks:{ label: c => ' ' + c.dataset.label + ': ' + (c.parsed.y !== null ? c.parsed.y.toFixed(2)+' cm' : '-') } }
+    },
+    scales:{
+      x:{ grid:{color:'rgba(0,200,255,0.06)'}, ticks:{color:'#607a99',font:{family:'DM Sans',size:11},maxTicksLimit:8} },
+      y:{ grid:{color:'rgba(0,200,255,0.06)'}, ticks:{color:'#607a99',font:{family:'DM Sans',size:11},callback:v=>v+' cm'}, beginAtZero:false }
+    }
+  }
+});
+
+/* fullscreen chart */
+let fsChart = null;
+function openFullscreen() {
+  document.getElementById('fs-overlay').classList.add('open');
+  const ctx2 = document.getElementById('fs-chart').getContext('2d');
+  if (fsChart) { fsChart.destroy(); fsChart = null; }
+  fsChart = new Chart(ctx2, {
+    type:'line',
+    data:{
+      labels:[...labels],
+      datasets:[
+        { label:'Actual', data:[...actualArr], borderColor:'#00c8ff', backgroundColor:'rgba(0,200,255,0.07)',
+          borderWidth:2.5, tension:0.45, fill:true, pointRadius:3, pointBackgroundColor:'#00c8ff' },
+        { label:'Predicted', data:[...predArr], borderColor:'#ffb700', backgroundColor:'transparent',
+          borderWidth:2, borderDash:[7,5], tension:0.45, fill:false, pointRadius:2, pointBackgroundColor:'#ffb700' },
+        { label:'Threshold', data:labels.map(()=>EXPECTED), borderColor:'rgba(255,60,90,0.5)',
+          borderWidth:1.5, borderDash:[4,4], tension:0, fill:false, pointRadius:0 }
+      ]
+    },
+    options:{ responsive:true, maintainAspectRatio:false, animation:{duration:300},
+      plugins:{ legend:{display:true, labels:{color:'#607a99',font:{family:'DM Sans',size:12}}} },
+      scales:{ x:{grid:{color:'rgba(0,200,255,0.06)'},ticks:{color:'#607a99'}},
+               y:{grid:{color:'rgba(0,200,255,0.06)'},ticks:{color:'#607a99',callback:v=>v+' cm'},beginAtZero:false} } }
+  });
+}
+function closeFullscreen() { document.getElementById('fs-overlay').classList.remove('open'); }
+
+/* ===== EXPORT CSV ===== */
+function exportCSV() {
+  const slice = actualArr.slice(-20);
+  const rows  = [['#','Actual (cm)','Predicted (cm)','Difference (cm)','SEI','Status']];
+  for (let i = slice.length-1; i >= 0; i--) {
+    const actual = slice[i];
+    const pred   = lastPred;
+    const diff   = pred !== null ? (actual-pred) : null;
+    const sei    = ((EXPECTED-actual)/EXPECTED).toFixed(3);
+    let status   = 'NORMAL';
+    if (parseFloat(sei)>ENC_THRESH) status='ENCROACHMENT';
+    else if (parseFloat(sei)>TMP_THRESH) status='TEMPORARY';
+    rows.push([actualArr.length-slice.length+i+1, actual.toFixed(2),
+               pred!==null?pred.toFixed(2):'', diff!==null?diff.toFixed(2):'', sei, status]);
+  }
+  const csv  = rows.map(r=>r.join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href=url; a.download='spacesense_log_'+new Date().toISOString().slice(0,19).replace(/:/g,'-')+'.csv';
+  a.click(); URL.revokeObjectURL(url);
+}
+
+/* ===== HEATMAP ===== */
+function drawHeatmap() {
+  const canvas = document.getElementById('heatmap-canvas');
+  const ctx    = canvas.getContext('2d');
+  canvas.width  = canvas.offsetWidth;
+  canvas.height = 320;
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  if (actualArr.length === 0) {
+    ctx.fillStyle = '#607a99'; ctx.font = '14px DM Sans'; ctx.textAlign = 'center';
+    ctx.fillText('No data yet — waiting for sensor readings...', W/2, H/2);
+    return;
+  }
+
+  const cellW = W / actualArr.length;
+  actualArr.forEach((d, i) => {
+    const sei   = (EXPECTED - d) / EXPECTED;
+    const ratio = Math.max(0, Math.min(1, sei));
+    let r, g, b;
+    if (ratio < 0.5) { r=Math.round(ratio*2*255); g=Math.round(200+(1-ratio*2)*55); b=50; }
+    else             { r=255; g=Math.round((1-(ratio-.5)*2)*200); b=50; }
+    const grad = ctx.createLinearGradient(i*cellW,0,i*cellW,H);
+    grad.addColorStop(0,  `rgba(${r},${g},${b},0.4)`);
+    grad.addColorStop(.5, `rgba(${r},${g},${b},0.95)`);
+    grad.addColorStop(1,  `rgba(${r},${g},${b},0.4)`);
+    ctx.fillStyle=grad;
+    ctx.fillRect(Math.floor(i*cellW), 0, Math.ceil(cellW)+1, H);
+  });
+
+  ctx.fillStyle='rgba(5,13,26,0.55)'; ctx.font='10px DM Sans'; ctx.textAlign='center';
+  actualArr.forEach((d, i) => {
+    if (i % 5 === 0 || i === actualArr.length - 1) {
+      ctx.fillText(d.toFixed(0)+'cm', i*cellW+cellW/2, H-8);
+    }
+  });
+
+  const legendW=Math.min(200,W*.3), legendX=W-legendW-16, legendY=12, legendH=12;
+  const lgr=ctx.createLinearGradient(legendX,0,legendX+legendW,0);
+  lgr.addColorStop(0,'rgba(0,220,100,0.9)'); lgr.addColorStop(.5,'rgba(255,200,0,0.9)'); lgr.addColorStop(1,'rgba(255,30,50,0.9)');
+  ctx.fillStyle=lgr; ctx.beginPath(); ctx.roundRect(legendX,legendY,legendW,legendH,4); ctx.fill();
+  ctx.fillStyle='#e2f4ff'; ctx.font='10px DM Sans';
+  ctx.textAlign='left';  ctx.fillText('Clear',         legendX,          legendY+legendH+12);
+  ctx.textAlign='right'; ctx.fillText('Encroachment', legendX+legendW,  legendY+legendH+12);
+}
+
+/* ===== DIFFERENCE TABLE ===== */
+function updateDiffTable(pred) {
+  const tbody = document.getElementById('diff-tbody');
+  tbody.innerHTML = '';
+  const slice = actualArr.slice(-20);
+  for (let i = slice.length-1; i >= 0; i--) {
+    const actual = slice[i];
+    const diff   = pred !== null ? (actual-pred) : null;
+    const sei    = ((EXPECTED-actual)/EXPECTED).toFixed(3);
+    let status='NORMAL', statusClass='ok';
+    if (parseFloat(sei)>ENC_THRESH)      { status='ENCROACHMENT'; statusClass='danger'; }
+    else if (parseFloat(sei)>TMP_THRESH) { status='TEMPORARY';    statusClass='warn'; }
+    const tr=document.createElement('tr');
+    tr.innerHTML =
+      '<td>'+(actualArr.length-slice.length+i+1)+'</td>'+
+      '<td>'+actual.toFixed(2)+' cm</td>'+
+      '<td>'+(pred!==null?pred.toFixed(2)+' cm':'--')+'</td>'+
+      '<td class="'+(diff===null?'diff-zero':diff>0?'diff-pos':diff<0?'diff-neg':'diff-zero')+'">'+(diff!==null?(diff>0?'+':'')+diff.toFixed(2)+' cm':'--')+'</td>'+
+      '<td>'+sei+'</td>'+
+      '<td><span class="status-badge '+statusClass+'">'+status+'</span></td>';
+    tbody.appendChild(tr);
+  }
+}
+
+/* ===== HELPERS ===== */
+function removeShimmer(id) { document.getElementById(id).classList.remove('shimmer'); }
+
+function setStatus(sei, dist) {
+  const valEl   = document.getElementById('val-status');
+  const badgeEl = document.getElementById('status-badge');
+  removeShimmer('val-status');
+  let newStatus;
+  if (sei > ENC_THRESH)      { valEl.className='card-value danger'; valEl.textContent='ENCROACHMENT'; badgeEl.innerHTML='<div class="status-badge danger">&#128680; Immediate Action</div>'; newStatus='danger'; }
+  else if (sei > TMP_THRESH) { valEl.className='card-value warn';   valEl.textContent='TEMPORARY';    badgeEl.innerHTML='<div class="status-badge warn">&#9888;&#65039; Monitor Closely</div>'; newStatus='warn'; }
+  else                       { valEl.className='card-value ok';     valEl.textContent='NORMAL';       badgeEl.innerHTML='<div class="status-badge ok">&#9989; All Clear</div>'; newStatus='ok'; }
+
+  if (newStatus !== prevStatus) {
+    if (newStatus === 'danger') {
+      alertBeep();
+      addAlert('danger', '🚨 ENCROACHMENT detected — space boundary crossed!', sei, dist);
+    } else if (newStatus === 'warn') {
+      addAlert('warn', '⚠️ TEMPORARY encroachment — space is narrowing', sei, dist);
+    } else if (prevStatus !== null) {
+      addAlert('ok', '✅ Status returned to NORMAL', sei, dist);
+    }
+    prevStatus = newStatus;
+  }
+}
+
+function fetchJSON(url, ms=5000) {
+  const ctrl=new AbortController(), t=setTimeout(()=>ctrl.abort(),ms);
+  return fetch(url,{signal:ctrl.signal}).then(r=>r.json()).finally(()=>clearTimeout(t));
+}
+
+/* ===== POLL ===== */
+async function poll() {
+  try {
+    const [latestData, histData, predData] = await Promise.all([
+      fetchJSON(LATEST_URL), fetchJSON(HISTORY_URL), fetchJSON(PRED_URL)
+    ]);
+
+    /* 1 — latest */
+    let latestDist = null;
+    if (latestData && typeof latestData==='object' && 'distance' in latestData)
+      latestDist = parseFloat(latestData.distance);
+    if (latestDist !== null && !isNaN(latestDist)) {
+      updateTrend(latestDist);
+      prevDist = latestDist;
+      removeShimmer('val-distance');
+      document.getElementById('val-distance').textContent = latestDist.toFixed(1)+' cm';
+      const sei = (EXPECTED-latestDist)/EXPECTED;
+      removeShimmer('val-sei');
+      document.getElementById('val-sei').textContent = sei.toFixed(3);
+      drawGauge(Math.max(0,Math.min(1,sei)));
+      setStatus(sei, latestDist);
+      lastSeenTs = new Date();
+      document.getElementById('lastseen-val').textContent = lastSeenTs.toLocaleTimeString();
+    }
+
+    /* 2 — history */
+    let readings = [];
+    if (histData && typeof histData==='object' && !Array.isArray(histData)) {
+      readings = Object.entries(histData).sort((a,b)=>a[0]<b[0]?-1:1).map(([,v])=>v).filter(v=>v&&typeof v.distance!=='undefined');
+    }
+    if (readings.length===0 && latestDist!==null && !isNaN(latestDist)) readings=[{distance:latestDist}];
+    if (readings.length!==lastCount && readings.length>0) {
+      lastCount=readings.length;
+      const nL=[],nV=[];
+      readings.forEach((r,i)=>{ const d=parseFloat(r.distance); if(!isNaN(d)){nL.push(i+1);nV.push(parseFloat(d.toFixed(2)));} });
+      while(nL.length>MAX_POINTS){nL.shift();nV.shift();}
+      labels.splice(0,labels.length,...nL);
+      actualArr.splice(0,actualArr.length,...nV);
+      predArr.splice(0,predArr.length);
+      // update threshold line
+      chart.data.datasets[2].data = nL.map(()=>EXPECTED);
+      document.getElementById('readings-count').textContent = actualArr.length;
+    }
+
+    /* 3 — prediction */
+    let pred=null;
+    if (predData!==null && predData!==undefined)
+      pred = typeof predData==='object' && 'predicted_distance' in predData
+        ? parseFloat(predData.predicted_distance) : parseFloat(predData);
+    if (pred!==null && !isNaN(pred)) {
+      lastPred=pred;
+      removeShimmer('val-prediction');
+      document.getElementById('val-prediction').textContent=pred.toFixed(2)+' cm';
+      while(predArr.length<actualArr.length) predArr.push(pred);
+      while(predArr.length>actualArr.length) predArr.pop();
+      if(predArr.length>0) predArr[predArr.length-1]=pred;
+      if(predData&&typeof predData==='object'){
+        if(predData.model) document.getElementById('m-type').textContent=predData.model;
+        if(predData.samples_used!==undefined) document.getElementById('m-samples').textContent=predData.samples_used;
+        document.getElementById('m-loss').textContent=predData.training_loss!==undefined?parseFloat(predData.training_loss).toFixed(5):'N/A';
+        if(predData.timestamp) document.getElementById('m-time').textContent=new Date(predData.timestamp*1000).toLocaleTimeString();
+      }
+    } else { document.getElementById('val-prediction').textContent='Waiting...'; }
+
+    chart.update();
+
+    if (document.getElementById('page-heatmap').classList.contains('active')) { drawHeatmap(); updateDiffTable(lastPred); }
+    if (document.getElementById('page-analytics').classList.contains('active')) updateAnalytics();
+    if (document.getElementById('page-alerts').classList.contains('active')) renderAlerts();
+
+  } catch(e) { console.warn('[SPACESENSE]', e); }
+}
+
+/* ===== SETTINGS APPLY ===== */
+function applySettings() {
+  const e = parseFloat(document.getElementById('cfg-expected').value);
+  const i = parseInt(document.getElementById('cfg-interval').value);
+  const m = parseInt(document.getElementById('cfg-maxpts').value);
+  const et= parseFloat(document.getElementById('cfg-enc-thresh').value);
+  const tt= parseFloat(document.getElementById('cfg-tmp-thresh').value);
+  const snd=document.getElementById('cfg-sound').value;
+  if (!isNaN(e)&&e>0) EXPECTED=e;
+  if (!isNaN(i)&&i>=500) POLL_MS=i;
+  if (!isNaN(m)&&m>=10) MAX_POINTS=m;
+  if (!isNaN(et)) ENC_THRESH=et;
+  if (!isNaN(tt)) TMP_THRESH=tt;
+  SOUND_ON = snd==='ON';
+  clearInterval(pollTimer);
+  if (!isPaused) { poll(); pollTimer=setInterval(poll,POLL_MS); }
+  document.getElementById('settings-note').textContent='✓ Settings applied at '+new Date().toLocaleTimeString();
+}
+
+/* ===== START ===== */
+poll();
+pollTimer = setInterval(poll, POLL_MS);
+</script>
+</body>
+</html>
